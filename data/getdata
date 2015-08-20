@@ -1,0 +1,7 @@
+#!/bin/sh
+
+wget -c http://robotics.stanford.edu/~gal/Data/NIPS/nips_1-17.mat
+wget -c http://homepage.tudelft.nl/19j49/multiplemaps/Multiple_maps_t-SNE/Multiple_maps_t-SNE_files/mm_tsne.zip
+unzip -p mm_tsne.zip association1000.mat > association1000.mat 
+unzip -p mm_tsne.zip association5000.mat > association5000.mat
+unzip -p mm_tsne.zip nips_1-22.mat > nips_1-22.mat

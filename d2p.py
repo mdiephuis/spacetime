@@ -36,15 +36,14 @@ def d2p( d2, perplexity, beta=None, verbose=False ):
         perplexity = np.minimum( perplexity, n-2 )
 
     if verbose:
-        print "computing P(%dx%d) with per=%.0f..." % (N, n, perplexity),
+        print( "computing P(%dx%d) with per=%.0f..." % (N, n, perplexity), )
 
     P = np.zeros_like( d2 )
     if beta == None: beta = np.ones( N )
 
     for i in range( N ):
-        # use the average 5NN distance
-        tmp = d2[i][ d2[i] > EPS ]
-        beta[i] = 1. / np.sort(tmp)[:5].mean()
+        # start with a very big perplexity
+        beta[i] = 1. / d2[i].max()
         betamin = -np.inf
         betamax = np.inf
 
@@ -52,18 +51,18 @@ def d2p( d2, perplexity, beta=None, verbose=False ):
             p = np.exp( -d2[i] * beta[i] )
             p[i] = 0
 
-            E = np.log(p.sum()) + beta[i]*(p*d2[i]).sum()/p.sum()
-            if p.max() < 1e-10: break
-
+            E = np.log( p.sum() ) + beta[i]*(p*d2[i]).sum() / ( p.sum()+10*EPS )
             Ediff = E - np.log( perplexity )
             if( np.abs(Ediff) < TOL ):
                 break
+
             elif Ediff > 0:
                 betamin = beta[i]
                 if betamax == np.inf:
                     beta[i] = beta[i] * 2
                 else:
                     beta[i] = (beta[i] + betamax) / 2
+
             else:
                 betamax = beta[i]
                 if betamin == -np.inf:
@@ -72,7 +71,7 @@ def d2p( d2, perplexity, beta=None, verbose=False ):
                     beta[i] = (beta[i] + betamin) / 2
 
         # recheck
-        E = np.log(p.sum()) + beta[i]*(p*d2[i]).sum()/p.sum()
+        E = np.log(p.sum()) + beta[i]*(p*d2[i]).sum() / (p.sum()+10*EPS)
         if np.abs( E - np.log(perplexity) ) > TOL:
             print "perplexity=%.1f does not satisfy the" \
                   "requirement perplexity=%.0f" % (np.exp(E), perplexity)
