@@ -14,7 +14,6 @@ ALG_ARR   = [ 'sne', 'tsne', 'st' ]
 DIM_ARR   = [ 2, 3, 4 ]
 REPEAT    = 50
 spacetime.conv_threshold = 1e-9
-spacetime.lrate_s = 100
 spacetime.min_epochs     = 500   # ensure enough convergence
 INIT_SEED = 3127
 
@@ -44,8 +43,7 @@ else:
     print( 'unknown dataset: ', DATA )
     sys.exit(1)
 
-if P.shape[0] > 2000:
-    REPEAT /= 5
+if P.shape[0] > 2000: REPEAT /= 5
 
 if ALG == 'sne':
     spacetime.distribution = 'gaussian'

@@ -12,7 +12,7 @@ import sys, os
 EPS = np.finfo( float ).eps
 
 def load_words( number=1000 ):
-    data_file = '../data/association%d.mat' % number
+    data_file = 'data/association%d.mat' % number
     bin_file  = os.path.splitext( data_file )[0] + '.npz'
     if not os.access( bin_file, os.R_OK ):
         print( 'rebuilding P matrix' )

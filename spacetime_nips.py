@@ -17,7 +17,7 @@ OUTPUT = 'eps'
 def load_nips():
     '''load the NIPS co-authorship dataset'''
 
-    data_file = '../data/nips_1-17.mat'
+    data_file = 'data/nips_1-17.mat'
     bin_file  = os.path.splitext( data_file )[0] + '.npz'
     if not os.access( bin_file, os.R_OK ):
         print( 'rebuilding P matrix' )

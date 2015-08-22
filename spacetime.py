@@ -31,20 +31,18 @@ import sys, time
 
 opt = sys.modules[ __name__ ]
 
-opt.min_epochs            = 0     # min no of iterations
-opt.max_epochs            = 3000  # max no of iterations
-opt.lrate_s               = 100   # learning rate along space
-opt.lrate_t               = 1     # learning rate along time
-opt.momentum_init         = 0.5   # initial momentum
-opt.momentum_final        = 0.8   # final momentum
-opt.momentum_switch_epoch = 250   # when to speed up
-opt.min_gain              = 1e-3
-opt.max_gain              = 10
+opt.min_epochs            = 0      # min no of iterations
+opt.max_epochs            = 5000   # max no of iterations
+opt.lrate_s               = 100    # learning rate along space
+opt.lrate_t               = 1      # learning rate along time
+opt.momentum              = (0.5, 0.8, 0.9) # momentums
+opt.momentum_epoch        = (250, 1000)     # when to speed up
 opt.distribution          = 'student'
 opt.lying                 = 100
 opt.output_intv           = 100
 opt.conv_threshold        = 1e-7
-opt.eps                   = np.finfo( float ).eps
+
+EPS = np.finfo( float ).eps
 
 sys.stdout = sys.stderr
 
@@ -100,7 +98,7 @@ def st_sned( dx2,
     for i in range( dx2.shape[0] ): P[i,i] = 0
     P = P + P.T
     P /= P.sum()
-    P = np.maximum( P, opt.eps )
+    P = np.maximum( P, EPS )
     if verbose: print( "done" )
 
     return st_snep( P, dim_s, dim_t, init_y, verbose, repeat, init_seed )
@@ -127,8 +125,6 @@ def st_snep( P,
         print( "%-15s = %d"   % ( "max_epochs", opt.max_epochs ) )
         print( "%-15s = %.1f" % ( "learning rate (s)", opt.lrate_s ) )
         print( "%-15s = %.1f" % ( "learning rate (t)", opt.lrate_t ) )
-        print( "%-15s = %.1f" % ( "momentum (init)", opt.momentum_init ) )
-        print( "%-15s = %.1f" % ( "momentum (final)", opt.momentum_final ) )
         print( "%-15s = %s"   % ( "lying", opt.lying ) )
 
     best_Y = None
@@ -148,7 +144,7 @@ def st_snep( P,
 
         Z = 1e-5 * np.random.randn( N, dim_t ).astype( np.float32 )
         Z_incs   = np.zeros_like( Z )
-        Z_gains  = np.ones_like(  Z )
+        Z_gain   = 1
 
         E = []
 
@@ -158,10 +154,12 @@ def st_snep( P,
                         # "early exaggeration"
 
         for epoch in range( opt.max_epochs ):
-            if epoch < opt.momentum_switch_epoch:
-                momentum = opt.momentum_init
+            if epoch < opt.momentum_epoch[0]:
+                momentum = opt.momentum[0]
+            elif epoch < opt.momentum_epoch[1]:
+                momentum = opt.momentum[1]
             else:
-                momentum = opt.momentum_final
+                momentum = opt.momentum[2]
 
             if ( opt.lying > 0 ) and ( epoch == opt.lying ):
                 if verbose: print( '[%4d]  stop lying' % epoch )
@@ -175,13 +173,11 @@ def st_snep( P,
 
             if opt.distribution == 'student':
                 Q = np.exp( dz2 ) / ( 1 + dy2 )
-            #elif opt.distribution == 'student_t':
-            #    Q = ( 1 + dz2 ) / ( 1 + dy2 )
             else:
                 Q = np.exp( dz2 - dy2 )
             for i in range( N ): Q[i,i] = 0
-            Q /= ( Q.sum() + 10 * opt.eps )
-            Q = np.maximum( Q, opt.eps )
+            Q /= ( Q.sum() + 10 * EPS )
+            Q = np.maximum( Q, EPS )
             E.append( (P*np.log(P)).sum() - (P*np.log(Q)).sum() )
 
             if opt.distribution == 'student':
@@ -193,40 +189,39 @@ def st_snep( P,
 
             Y_gains = (Y_gains+.2) * ( np.sign(Y_grad)!=np.sign(Y_incs) ) \
                     + (Y_gains*.8) * ( np.sign(Y_grad)==np.sign(Y_incs) )
-            Y_gains = np.maximum( Y_gains, opt.min_gain )
-            Y_incs = momentum * Y_incs - opt.lrate_s * Y_gains * Y_grad
+
+            Y_incs *= momentum
+            Y_incs -= opt.lrate_s * Y_gains * Y_grad
             Y += Y_incs
             Y -= Y.mean(0)
 
+            # learning slower on time-like dimensions
             if dim_t > 0:
-                #if opt.distribution == 'student_t':
-                #    W_z = ( Q - P ) / ( 1 + dz2 )
                 W_z = ( Q - P )
                 Z_grad = np.dot( np.diag( W_z.sum(0) ) - W_z, Z )
                 Z_grad -= Z_grad.mean( 0 )
 
-                # learning slower on time-like dimensions
-                Z_gains = (Z_gains+.2) * ( np.sign(Z_grad)!=np.sign(Z_incs) ) \
-                        + (Z_gains*.8) * ( np.sign(Z_grad)==np.sign(Z_incs) )
-                Z_gains = np.maximum( Z_gains, opt.min_gain )
-                Z_gains = np.minimum( Z_gains, opt.max_gain )
-                Z_incs = momentum * Z_incs - opt.lrate_t * Z_gains * Z_grad
-                #Z_incs = momentum * Z_incs - opt.lrate_t * Z_grad
+                if (Z_grad * Z_incs).sum() < 0:
+                    Z_gain += .2
+                else:
+                    Z_gain *= .8
 
+                Z_incs *= momentum
+                Z_incs -= opt.lrate_t * Z_gain * Z_grad
                 Z += Z_incs
                 Z -= Z.mean(0)
 
             conv_flag = converged( E )
             if verbose and ( conv_flag or epoch % opt.output_intv == 0 ):
-                print( "[%4d] |Y|=%5.2f |Y_grad|=%8.4fe-5 " \
+                print( "[%4d] |Y|=%6.2f |Y_grad|=%7.3fe-5" \
                        % ( epoch,
                            np.abs(Y).max(),
-                           np.mean(np.abs(Y_grad))*1e5 ), end="" )
+                           np.mean(np.abs(Y_grad))*1e5 ), end=" " )
 
                 if dim_t > 0:
-                    print( "|Z|=%5.2f |Z_grad|=%8.4fe-5" \
+                    print( "|Z|=%5.2f |Z_grad|=%7.3fe-5" \
                            % ( np.abs(Z).max(),
-                               np.mean(np.abs(Z_grad))*1e5 ), end="" )
+                               np.mean(np.abs(Z_grad))*1e5 ), end=" " )
 
                 if conv_flag:
                     print( "E=%6.3f (converged)" % E[-1] )
