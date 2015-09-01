@@ -2,41 +2,41 @@
 
 from __future__ import print_function
 
-import spacetime, spacetime_nips, spacetime_words
+from nips import load_nips
+from words import load_words
+
+import spacetime
 import numpy as np
 import scipy.io
 import itertools
-import sys, os
-import re
+import sys, os, re, argparse
 
-DATA_ARR  = [ 'nips', 'words1000', 'words5000' ]
+DATA_ARR  = [ 'nips22', 'words1000', 'words5000' ]
 ALG_ARR   = [ 'sne', 'tsne', 'st' ]
 DIM_ARR   = [ 2, 3, 4 ]
-REPEAT    = 50
+REPEAT    = 100
 spacetime.conv_threshold = 1e-9
 spacetime.min_epochs     = 500   # ensure enough convergence
-INIT_SEED = 3127
+INIT_SEED = 3129
 
 CONFIGS = list( itertools.product( DATA_ARR, ALG_ARR, DIM_ARR ) )
 
-if len( sys.argv ) < 2: 
-    print( 'usage: %s expno (0-%d)' % ( sys.argv[0], len(CONFIGS)-1 ) )
-    sys.exit(1)
+parser = argparse.ArgumentParser()
+parser.add_argument( 'exp', choices=range(len(CONFIGS)), type=int )
+args = parser.parse_args()
 
-try:
-    DATA, ALG, DIM = CONFIGS[ int(sys.argv[1]) ]
-except:
-    print( 'usage: %s expno (0-%d)' % ( sys.argv[0], len(CONFIGS)-1 ) )
-    sys.exit(1)
+DATA, ALG, DIM = CONFIGS[ args.exp ]
 
-if DATA == 'nips':
-    C, P, authors, no_papers = spacetime_nips.load_nips()
+nips_pattern = re.compile( '^nips(\d+)$' )
+words_pattern = re.compile( '^words(\d+)$' )
+if nips_pattern.match( DATA ):
+    num_vols = int( nips_pattern.match( DATA ).groups()[0] )
+    C, P, authors, no_papers = load_nips( num_vols )
     print( "%d authors" % C.shape[0] )
 
-elif DATA.startswith( 'words' ):
-    pattern = re.compile( '^words(\d+)$' )
-    P, words = spacetime_words.load_words( 
-               int( pattern.match( DATA ).groups()[0] ) )
+elif words_pattern.match( DATA ):
+    num_words = int( words_pattern.match( DATA ).groups()[0] )
+    P, words = load_words( num_words )
     print( "%d words" % P.shape[0] )
 
 else:

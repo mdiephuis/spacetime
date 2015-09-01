@@ -43,7 +43,7 @@ if __name__ == '__main__':
         print( 'E=%.3f' % E )
     else:
         spacetime.conv_threshold = 1e-9
-        Y, Z, E = spacetime.st_snep( P, 2, 1, repeat=10 )
+        Y, Z, E = spacetime.st_snep( P, 2, 1, repeat=50 )
         np.savez( result_file, Y=Y, Z=Z, E=E )
 
     scale_Z = np.sqrt( (Z**2).sum(1) )

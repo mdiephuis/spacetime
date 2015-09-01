@@ -5,4 +5,4 @@
 #SBATCH -t 72:00:00
 #SBATCH --array=0-26
 
-python spacetime_kl.py $SLURM_ARRAY_TASK_ID
+python kl.py $SLURM_ARRAY_TASK_ID

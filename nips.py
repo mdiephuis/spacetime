@@ -10,21 +10,30 @@ import numpy as np
 import scipy.io
 import os, sys
 
-REPEAT = 10
+REPEAT = 50
 EPS = np.finfo( float ).eps
 OUTPUT = 'eps'
 
-def load_nips():
+def load_nips( num_vols ):
     '''load the NIPS co-authorship dataset'''
 
-    data_file = 'data/nips_1-17.mat'
+    if not ( num_vols in (17,22) ):
+        raise RuntimeError( 'num_vols=%d' % num_vols )
+
+    data_file = 'data/nips_1-%d.mat' % num_vols
     bin_file  = os.path.splitext( data_file )[0] + '.npz'
     if not os.access( bin_file, os.R_OK ):
         print( 'rebuilding P matrix' )
         raw = scipy.io.loadmat( data_file )
 
-        documents = np.array( raw['docs_authors'].todense() )
-        authors   = raw['authors_names'][0]
+        if num_vols == 17:
+            documents = np.array( raw['docs_authors'].todense(), dtype=np.uint8 )
+            authors   = raw['authors_names'][0]
+        elif num_vols == 22:
+            documents = np.array( raw['documents'].todense(), dtype=np.uint8 )
+            authors   = raw['authors'][0]
+        else:
+            raise RuntimeError( 'num_vols=%d' % num_vol )
 
         N = authors.shape[0]
         C = np.zeros( [N, N], dtype=np.float32 )
@@ -177,23 +186,24 @@ def visualize( y, authors, C, weights, big_guys, title ):
                 dpi=600 )
 
 if __name__ == '__main__':
-    C, P, authors, no_papers = load_nips()
+    num_vols = 22
+    C, P, authors, no_papers = load_nips( num_vols )
     print( "%d authors" % C.shape[0] )
     big_guys = np.nonzero( no_papers >= 10 )[0]
     print( "%d authors have >=10 NIPS papers" % big_guys.size )
 
     # embedding
-    result_file = 'spacetime_nips_result.npz'
+    result_file = 'spacetime_nips%d_result.npz' % num_vols
     if os.access( result_file, os.R_OK ):
         print( 'loading results from %s' % result_file )
         tmp = np.load( result_file )
         sne_E  = tmp['sne_E']
-        sne_Y  = tmp['sne_y']
+        sne_Y  = tmp['sne_Y']
         tsne_E = tmp['tsne_E']
-        tsne_Y = tmp['tsne_y']
+        tsne_Y = tmp['tsne_Y']
         spacetime_E = tmp['spacetime_E']
-        spacetime_Y = tmp['spacetime_y']
-        spacetime_Z = tmp['spacetime_z']
+        spacetime_Y = tmp['spacetime_Y']
+        spacetime_Z = tmp['spacetime_Z']
 
         #tsne_multi_E = tmp['tsne_multi_E']
         #tsne_multi_y = tmp['tsne_multi_y']
