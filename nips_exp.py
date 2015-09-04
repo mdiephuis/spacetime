@@ -189,7 +189,7 @@ if __name__ == '__main__':
     num_vols = 22
     C, P, authors, no_papers = load_nips( num_vols )
     print( "%d authors" % C.shape[0] )
-    big_guys = np.nonzero( no_papers >= 10 )[0]
+    big_guys = np.nonzero( no_papers >= 13 )[0]
     print( "%d authors have >=10 NIPS papers" % big_guys.size )
 
     # embedding

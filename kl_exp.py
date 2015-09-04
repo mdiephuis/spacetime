@@ -2,8 +2,9 @@
 
 from __future__ import print_function
 
-from nips import load_nips
-from words import load_words
+from ca_exp import load_ca
+from nips_exp import load_nips
+from words_exp import load_words
 
 import spacetime
 import numpy as np
@@ -11,13 +12,13 @@ import scipy.io
 import itertools
 import sys, os, re, argparse
 
-DATA_ARR  = [ 'nips22', 'words1000', 'words5000' ]
+DATA_ARR  = [ 'ca', 'words1000', 'words5000' ]
 ALG_ARR   = [ 'sne', 'tsne', 'st' ]
 DIM_ARR   = [ 2, 3, 4 ]
 REPEAT    = 100
 spacetime.conv_threshold = 1e-9
 spacetime.min_epochs     = 500   # ensure enough convergence
-INIT_SEED = 3129
+INIT_SEED = 31333
 
 CONFIGS = list( itertools.product( DATA_ARR, ALG_ARR, DIM_ARR ) )
 
@@ -29,7 +30,12 @@ DATA, ALG, DIM = CONFIGS[ args.exp ]
 
 nips_pattern = re.compile( '^nips(\d+)$' )
 words_pattern = re.compile( '^words(\d+)$' )
-if nips_pattern.match( DATA ):
+
+if DATA == 'ca':
+    P = load_ca()
+    print( '%d authors' % P.shape[0] )
+
+elif nips_pattern.match( DATA ):
     num_vols = int( nips_pattern.match( DATA ).groups()[0] )
     C, P, authors, no_papers = load_nips( num_vols )
     print( "%d authors" % C.shape[0] )
