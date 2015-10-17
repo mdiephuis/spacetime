@@ -11,21 +11,35 @@ import numpy as np
 import sys, os
 EPS = np.finfo( float ).eps
 
-def load_words( number=1000 ):
+def __rebuild( data_file, bin_file, dtype ):
+    print( 'rebuilding P matrix' )
+    raw = scipy.io.loadmat( data_file )
+    words = raw['words']
+    P     = raw['P'].astype( dtype )
+    # note this P is not symmetric
+
+    P /= P.sum(1)[:,None]
+    P = P + P.T
+    P /= P.sum()
+    P = np.maximum( P, EPS )
+
+    print( "saving to '%s'" % bin_file )
+    np.savez( bin_file, P=P, words=words )
+
+def load_words( number=1000, dtype=np.float32 ):
+    if not ( number in (1000,5000) ):
+        raise RuntimeError( 'number=%d' % number )
+
     data_file = 'data/association%d.mat' % number
     bin_file  = os.path.splitext( data_file )[0] + '.npz'
+
+    if not os.access( data_file, os.R_OK ):
+        raise RuntimeError( "'%s' missing" % data_file )
+
     if not os.access( bin_file, os.R_OK ):
-        print( 'rebuilding P matrix' )
-        raw = scipy.io.loadmat( data_file )
-        words = raw['words']
-        P     = raw['P'].astype( np.float32 )
+        __rebuild( data_file, bin_file, dtype )
 
-        P /= P.sum(1)[:,np.newaxis]
-        P = P + P.T
-        P /= P.sum()
-        P = np.maximum( P, EPS )
-        np.savez( bin_file, P=P, words=words )
-
+    print( "loading from '%s'" % bin_file )
     _tmp = np.load( bin_file )
     return _tmp['P'], _tmp['words']
 

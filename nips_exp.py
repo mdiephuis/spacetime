@@ -8,13 +8,63 @@ import matplotlib.lines as lines
 from matplotlib.transforms import Bbox
 import numpy as np
 import scipy.io
-import os, sys
+import os, itertools
 
 REPEAT = 50
-EPS = np.finfo( float ).eps
+EPS    = np.finfo( float ).eps
 OUTPUT = 'eps'
 
-def load_nips( num_vols ):
+def __rebuild( data_file, bin_file, num_vols, dtype ):
+    '''
+    parse the raw data in data_file and
+    store the co-authorship matrix in bin_file
+    '''
+    print( 'rebuilding P matrix' )
+    raw = scipy.io.loadmat( data_file )
+
+    if num_vols == 17:
+        documents = np.array( raw['docs_authors'].todense(), dtype=np.uint8 )
+        authors   = raw['authors_names'][0]
+    elif num_vols == 22:
+        documents = np.array( raw['documents'].todense(), dtype=np.uint8 )
+        authors   = raw['authors'][0]
+    else:
+        raise RuntimeError( 'num_vols=%d' % num_vols )
+
+    N = authors.shape[0]
+    assert( N == documents.shape[1] )
+    print( 'originally, %d authors, %d papers in total' % \
+           ( N, documents.shape[0] ) )
+
+    # building the co-authorship matrix within authors with 2 papers
+    have_two_papers = ( documents.sum(0) >= 2 )
+    C = np.zeros( [N, N], dtype=dtype )
+    for doc in documents:
+        for a1, a2 in itertools.combinations( np.nonzero( doc )[0], 2 ):
+            if have_two_papers[a1] and have_two_papers[a2]:
+                C[a1, a2] += 1
+                C[a2, a1] += 1
+
+    idx = ( C.sum(0) >= 1 )
+    print( 'removing %d young authors' % ( C.shape[0] - idx.sum() ) )
+
+    C = C[idx][:,idx]
+    authors = authors[idx]
+    documents = documents[:, idx]
+    print( '%d authors left' % C.shape[0] )
+    print( "they co-authored %d papers" % ( documents.sum(1) >= 2 ).sum() )
+
+    # normalize P
+    P = C.copy()
+    P /= P.sum(0)
+    P = P + P.T
+    P /= P.sum()
+    P = np.maximum( P, EPS )
+
+    print( "saving to '%s'" % bin_file )
+    np.savez( bin_file, C=C, P=P, authors=authors, no_papers=documents.sum( 0 ) )
+
+def load_nips( num_vols, dtype=np.float32 ):
     '''load the NIPS co-authorship dataset'''
 
     if not ( num_vols in (17,22) ):
@@ -22,63 +72,12 @@ def load_nips( num_vols ):
 
     data_file = 'data/nips_1-%d.mat' % num_vols
     bin_file  = os.path.splitext( data_file )[0] + '.npz'
+
+    if not os.access( data_file, os.R_OK ):
+        raise RuntimeError( "'%s' missing" % data_file )
+
     if not os.access( bin_file, os.R_OK ):
-        print( 'rebuilding P matrix' )
-        raw = scipy.io.loadmat( data_file )
-
-        if num_vols == 17:
-            documents = np.array( raw['docs_authors'].todense(), dtype=np.uint8 )
-            authors   = raw['authors_names'][0]
-        elif num_vols == 22:
-            documents = np.array( raw['documents'].todense(), dtype=np.uint8 )
-            authors   = raw['authors'][0]
-        else:
-            raise RuntimeError( 'num_vols=%d' % num_vol )
-
-        N = authors.shape[0]
-        C = np.zeros( [N, N], dtype=np.float32 )
-        assert( N == documents.shape[1] )
-        print( 'originally, %d authors, %d papers in total' % \
-               ( N, documents.shape[0] ) )
-
-        # building the co-authorship matrix
-        for doc in documents:
-            doc_authors = np.nonzero( doc )[0]
-            if len( doc_authors ) <= 1: continue
-            for a_1 in doc_authors:
-                for a_2 in doc_authors:
-                    if a_1 == a_2: continue
-                    C[a_1, a_2] += 1
-
-        # remove authors with only one paper
-        idx = ( documents.sum(0) >= 2 )
-        print( 'removing %d authors with only 1 paper' % \
-               ( C.shape[0] - idx.sum() ) )
-        C = C[idx][:,idx]
-        authors = authors[idx]
-        documents = documents[:, idx]
-
-        # remove authors without co-operations
-        idx = ( C.sum(0) >= 1 )
-        print( 'removing %d authors without cooperations' % \
-               ( C.shape[0] - idx.sum() ) )
-        C = C[idx][:,idx]
-        authors = authors[idx]
-        documents = documents[:, idx]
-        print( '%d authors left' % C.shape[0] )
-
-        no_papers = documents.sum( 0 )
-        print( "they co-authored %d papers" % \
-               ( documents.sum(1) > 1 ).sum() )
-
-        # normalize P
-        P = C.copy()
-        P /= P.sum(1)[:,np.newaxis]
-        P = P + P.T
-        P /= P.sum()
-        P = np.maximum( P, EPS )
-
-        np.savez( bin_file, C=C, P=P, authors=authors, no_papers=no_papers )
+        __rebuild( data_file, bin_file, num_vols, dtype )
 
     print( 'loading nips data from %s' % bin_file )
     _tmp       = np.load( bin_file )
