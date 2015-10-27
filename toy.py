@@ -35,6 +35,7 @@ def star( N, noise=0 ):
 
 data = circle( 300, 0.15 )
 #plt.scatter( data[:,0], data[:,1] ); plt.show()
+#data = teapot()
 
 _f, (ax1,ax2,ax3) = plt.subplots( 3 )
 spacetime.distribution = 'gaussian'

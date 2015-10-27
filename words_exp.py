@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-import matplotlib.colors as colors
-import matplotlib.cm as cmx
-import matplotlib.pyplot as plt
 
+from nips_exp import find_renderer, overlap_ratio
 import spacetime
 import scipy.io
 import numpy as np
@@ -16,7 +14,7 @@ def __rebuild( data_file, bin_file, dtype ):
     raw = scipy.io.loadmat( data_file )
     words = raw['words']
     P     = raw['P'].astype( dtype )
-    # note this P is not symmetric
+    # note this P is NOT symmetric
 
     P /= P.sum(1)[:,None]
     P = P + P.T
@@ -26,7 +24,7 @@ def __rebuild( data_file, bin_file, dtype ):
     print( "saving to '%s'" % bin_file )
     np.savez( bin_file, P=P, words=words )
 
-def load_words( number=1000, dtype=np.float32 ):
+def load_words( number=5000, dtype=np.float32 ):
     if not ( number in (1000,5000) ):
         raise RuntimeError( 'number=%d' % number )
 
@@ -43,88 +41,146 @@ def load_words( number=1000, dtype=np.float32 ):
     _tmp = np.load( bin_file )
     return _tmp['P'], _tmp['words']
 
-if __name__ == '__main__':
-    P, words = load_words()
-    print( '%d words' % P.shape[0] )
-
-    result_file = 'spacetime_words_result.npz'
-    if os.access( result_file, os.R_OK ):
-        print( 'using existing results in %s' % result_file )
-        tmp = np.load( result_file )
-        Y = tmp['Y']
-        Z = tmp['Z']
-        E = tmp['E']
-        print( 'E=%.3f' % E )
-    else:
+def __embed( P, result_file, repeat ):
+    '''
+    (optionally) compute the embeding and save it to disk
+    then load the embedding from disk
+    '''
+    if not os.access( result_file, os.R_OK ):
         spacetime.conv_threshold = 1e-9
-        Y, Z, E = spacetime.st_snep( P, 2, 1, repeat=50 )
+        spacetime.min_epochs     = 1000
+        spacetime.lrate_s = 500
+        spacetime.lrate_t = 1
+
+        Y, Z, E = spacetime.st_snep( P, 2, 1, repeat=repeat )
         np.savez( result_file, Y=Y, Z=Z, E=E )
 
+    print( 'loading results from "%s"' % result_file )
+    tmp = np.load( result_file )
+    return tmp['Y'], tmp['Z'], tmp['E']
+
+def __visualize( Y, Z, words, fig_file ):
+
+    import matplotlib.colors as colors
+    import matplotlib.cm as cmx
+    import matplotlib.pyplot as plt
+    from matplotlib import rc
+    rc( 'pdf',  fonttype=42 )
+    rc( 'ps',   fonttype=42 )
+
+    # visualize
+    fig = plt.figure( figsize=(8,8), dpi=600, frameon=True )
+    ax = plt.Axes( fig, [0, 0, 1, 1] )
+    ax.set_aspect( 'equal' )
+    ax.set_xticks( [ -150, -100, -50, 0, 50, 100, 150] )
+    ax.set_yticks( [ -150, -100, -50, 0, 50, 100, 150] )
+    fig.add_axes( ax )
+
+    to_show = []
+    for i in range( Y.shape[0] ):
+        if len( to_show ) > 0:
+            dist = np.sqrt( (( Y[to_show] - Y[i] )**2).sum(1) )
+            if dist.min() < 6: continue
+        to_show.append( i )
+    print( 'showing %d words' % len(to_show) )
+
+    cNorm     = colors.Normalize( vmin=-.8, vmax=.8 )
+    scalarMap = cmx.ScalarMappable( norm=cNorm, cmap='RdYlBu_r' )
+
     scale_Z = np.sqrt( (Z**2).sum(1) )
-    scale_Y = np.sqrt( (Y**2).sum(1) )
-    #plt.hist( scale_z ); plt.show()
-
-    rank = np.argsort( scale_Z )[::-1]
-    print( 'top 20 words by z:' )
-    for i in rank[:20]:
-        print( '%20s   z=%.2f' % ( words[i][0][0], Z[i,0] ) )
-    print( 'bottom 20 words:' )
-    for i in rank[-20:]:
-        print( '%20s   z=%.2f' % ( words[i][0][0], Z[i,0] ) )
-
-    outf = plt.figure( figsize=(10,8), frameon=True )
-
-    idx = []
-    scatter = np.zeros( [0,2] )
-    for i in range( P.shape[0] ):
-        if scatter.shape[0] > 0:
-            dist = np.sqrt( (( scatter - Y[i] )**2).sum(1) )
-            if dist.min() < 9: continue
-        idx.append( i )
-        scatter = np.vstack( [scatter, Y[i]] )
-    idx = np.array( idx )
-
-    cNorm     = colors.Normalize( vmin=-scale_Z.max(), vmax=scale_Z.max() )
-    scalarMap = cmx.ScalarMappable( norm=cNorm, cmap='jet' )
-
-    ax = outf.add_subplot( 111 )
-    ax.scatter( Y[idx,0], Y[idx,1], s=5, c='.5', linewidths=0 )
     font_s = (scale_Z      -scale_Z.min()) / \
-             (scale_Z.max()-scale_Z.min()) * 12 + 2      # from 12 to 14
-    for i in idx:
-        if scale_Z[i] > .9:
-            plt.annotate( words[i][0][0],
-                    xy = (Y[i,0], Y[i,1]),
-                    xytext = (-10, 0),
-                    size = font_s[i],
-                    textcoords = 'offset points',
-                    ha = 'right', va = 'bottom', 
-                    color = scalarMap.to_rgba( Z[i,0] ) )
-        else:
-            plt.annotate( words[i][0][0],
-                    xy = (Y[i,0], Y[i,1]),
-                    xytext = (-10, 0),
-                    size = font_s[i],
-                    textcoords = 'offset points',
-                    ha = 'right', va = 'bottom', )
+             (scale_Z.max()-scale_Z.min()) * 11 + 2
 
-    x_min = Y[idx,0].min()
-    x_max = Y[idx,0].max()
-    x_gap = .02 * (x_max-x_min)
-    y_min = Y[idx,1].min()
-    y_max = Y[idx,1].max()
-    y_gap = .02 * (y_max-y_min)
+    offset = .01 * ( plt.xlim()[1]-plt.xlim()[0] )
+    past_bb = []
+    for i in to_show:
+        tt = ax.text( Y[i,0], Y[i,1], words[i][0][0],
+                      size=font_s[i],
+                      rotation=0,
+                      color=scalarMap.to_rgba( Z[i,0] ),
+                      alpha = .9,
+                      va='center', ha='center' )
+        transf = ax.transData.inverted()
+        bb = tt.get_window_extent( renderer = find_renderer( fig ) ).transformed( transf ).get_points()
+
+        if overlap_ratio( past_bb, bb ) > .02:
+            best_o      = np.inf
+            best_adjust = None
+            search_range = np.vstack( [ np.linspace( 0,  5*offset, 20 ),
+                                        np.linspace( 0, -5*offset, 20 ) ]
+                                    ).flatten('F')
+            for x_adjust in search_range:
+                for y_adjust in search_range:
+                    oratio = overlap_ratio( past_bb, bb + np.array([x_adjust, y_adjust]) )
+                    if oratio < best_o * .95:
+                        best_o = oratio
+                        best_adjust = np.array( [x_adjust,y_adjust] )
+            bb += best_adjust
+            tt.set_x( .5*(bb[0,0]+bb[1,0]) )
+            tt.set_y( .5*(bb[0,1]+bb[1,1]) )
+        past_bb.append( bb )
+
+    x_min = Y[to_show,0].min()
+    x_max = Y[to_show,0].max()
+    x_gap = 0 * (x_max-x_min)
+    y_min = Y[to_show,1].min()
+    y_max = Y[to_show,1].max()
+    y_gap = 0 * (y_max-y_min)
     plt.xlim( x_min-x_gap, x_max+x_gap )
     plt.ylim( y_min-y_gap, y_max+y_gap )
 
-    scalarMap.set_array( [-scale_Z.max(), scale_Z.max()] )
-    cbar = plt.colorbar( scalarMap )
-    cbar.ax.set_aspect( 40 )
+    # histogram of Z
+    ax_inset = plt.axes( (0.03, 0.05, 0.2, 0.2), frameon=False )
+    counts, bins, patches = ax_inset.hist( Z, 9, fc='0.5', ec='gray' )
+    ax_inset.xaxis.set_ticks_position( "none" )
+    ax_inset.yaxis.set_ticks_position( "right" )
+    plt.xticks( [-1.5, 0, 1.5], size=8 )
+    plt.yticks( [500, 1000],    size=8 )
+    for _bin, _patch in zip( bins, patches ):
+        _patch.set_facecolor( scalarMap.to_rgba( _bin ) )
+    ax_inset.set_title( 'histogram of time coordinates', size=9 )
 
-    outf.savefig( 'spacetime_words.pdf',
-                  transparent=True,
-                  bbox_inches='tight',
-                  edge_color='white',
-                  pad_inches=0 )
-    plt.show()
+    # colorbar
+    scalarMap._A = []
+    cax  = fig.add_axes( [1.01, 0.01, 0.04, 0.98] )
+    cbar = fig.colorbar( scalarMap, ticks=[-.8, -.4, 0, .4, .8], cax=cax )
+    cax.text( .5, .5, '---time-->', size=14, rotation=90, va='center', ha='center' )
+    cbar.ax.yaxis.set_ticks_position( 'right' )
+    cbar.ax.set_yticklabels( ['<-0.8', '-0.4', '0', '0.4', '>0.8'] )
+
+    print( 'printing visualization to "%s"' % fig_file )
+    fig.savefig( fig_file,
+                 transparent=True,
+                 bbox_inches='tight',
+                 edge_color='white',
+                 pad_inches=0 )
+
+if __name__ == '__main__':
+    P, words = load_words( 5000 )
+    print( '%d words' % P.shape[0] )
+
+    if len( sys.argv ) > 1:
+        result_file = 'results/words_result_%s.npz' % sys.argv[1]
+    else:
+        result_file = 'results/words_result.npz'
+
+    Y, Z, E = __embed( P, result_file, 1 )
+
+    # show some ranking results
+    print( 'E=%.3f' % E )
+
+    scale_Z = np.sqrt( (Z**2).sum(1) )
+    scale_Y = np.sqrt( (Y**2).sum(1) )
+
+    rank = np.argsort( scale_Z )[::-1]
+    words_to_show = 25
+    print( 'top %d words by z:' % words_to_show )
+    for i in rank[:words_to_show]:
+        print( '%20s   z=%.2f' % ( words[i][0][0], Z[i,0] ) )
+    print( 'bottom %d words:' % words_to_show )
+    for i in rank[-words_to_show:]:
+        print( '%20s   z=%.2f' % ( words[i][0][0], Z[i,0] ) )
+
+    fig_file = os.path.splitext( result_file )[0] + '.pdf'
+    __visualize( Y, Z, words, fig_file )
 

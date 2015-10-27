@@ -72,8 +72,9 @@ def embed( P, alg, dim, repeat, seed ):
     return E
 
 if __name__ == '__main__':
-    DATA_ARR  = [ 'ca', 'nips17', 'nips22', 'words1000', 'words5000' ]
+    #DATA_ARR  = [ 'ca', 'nips17', 'nips22', 'words1000', 'words5000' ]
     #DATA_ARR  = [ 'school' ]
+    DATA_ARR = [ 'nips17', 'nips22' ]
     ALG_ARR   = [ 'sne', 'tsne', 'st' ]
     DIM_ARR   = [ 2, 3, 4 ]
     REPEAT    = 100
@@ -85,8 +86,11 @@ if __name__ == '__main__':
     # ensure enough convergence
     spacetime.conv_threshold = 1e-9
     spacetime.min_epochs     = 500
-    spacetime.lrate_s = 10
-    spacetime.lrate_t = .1
+    spacetime.lrate_s = 500
+    spacetime.lrate_t = 1
+
+    # output imediately
+    sys.stdout = sys.stderr
 
     CONFIGS = list( itertools.product( DATA_ARR, ALG_ARR, DIM_ARR ) )
     for idx, (data, alg, dim) in enumerate( CONFIGS ):

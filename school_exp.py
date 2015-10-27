@@ -35,12 +35,22 @@ def visualize( y, z ):
     fig.suptitle( '' )
     ax = fig.add_subplot( 111 )
 
-    ax.scatter( y[:,0], y[:,1], s=50,
-                linewidths=1,
-                c=z,
-                cmap='RdYlGn',
-                vmin=-np.abs( z ).max(),
-                vmax= np.abs( z ).max() )
+    if z.size > 0:
+        ax.scatter( y[:,0], y[:,1], s=50,
+                    linewidths=1,
+                    c=z,
+                    cmap='RdYlGn',
+                    vmin=-np.abs( z ).max(),
+                    vmax= np.abs( z ).max() )
+    else:
+        z = y[:,2]
+        ax.scatter( y[:,0], y[:,1], s=50,
+                    linewidths=1,
+                    c=z,
+                    cmap='RdYlGn',
+                    vmin=-np.abs( z ).max(),
+                    vmax= np.abs( z ).max() )
+
     plt.show()
 
 if __name__ == '__main__':
@@ -50,10 +60,10 @@ if __name__ == '__main__':
     spacetime.lrate_t = .01
 
     dim = 3
-    spacetime_Y,spacetime_Z,E1= spacetime.st_snep( P, dim-1, 1, repeat=1 )
-    #spacetime_Y,spacetime_Z,E2= spacetime.st_snep( P, dim, 0, repeat=10 )
+    #spacetime_Y,spacetime_Z,E1= spacetime.st_snep( P, dim-1, 1, repeat=1 )
+    spacetime_Y,spacetime_Z,E2= spacetime.st_snep( P, dim, 0, repeat=3 )
     #print( E1, E2 )
 
     visualize( spacetime_Y, spacetime_Z )
-    print( spacetime_Z )
+    #print( spacetime_Z )
 
