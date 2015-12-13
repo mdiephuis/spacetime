@@ -5,10 +5,10 @@ Space-time Embedding
 
 Batch gradient descent optimizer: along the space-like dimensions
 the delta-bar-delta rule (t-SNE by van der Maaten) is used; along
-the time-like dimensions a global adaptive learning rate is used
+the time-like dimensions one global adaptive learning rate is used
 
-Ke Sun
-University of Geneva
+author: Ke Sun < sunk [dot] edu [at] gmail [dot] com >
+suppored by University of Geneva
 Summer 2013 - Summer 2015
 """
 
@@ -194,7 +194,11 @@ def __embed( P, dim_s, dim_t, init_y, verbose, seed ):
             if verbose: print( '[%4d]  stop lying' % epoch )
             P /= 4
 
-        dy2 = dist2( Y )
+        if dim_s > 0:
+            dy2 = dist2( Y )
+        else:
+            dy2 = 0
+
         if dim_t > 0:
             dz2 = dist2( Z )
         else:                # without time-dimension
@@ -244,10 +248,11 @@ def __embed( P, dim_s, dim_t, init_y, verbose, seed ):
 
         conv_flag = __converged( E )
         if verbose and ( conv_flag or epoch % opt.output_intv == 0 ):
-            print( "[%4d] |Y|=%6.2f |Y_grad|=%7.3fe-5" \
-                   % ( epoch,
-                       np.abs(Y).max(),
-                       np.mean(np.abs(Y_grad))*1e5 ), end=" " )
+            print( '[%4d]' % epoch, end=' ' )
+            if dim_s > 0:
+                print( '|Y|=%6.2f |Y_grad|=%7.3fe-5' \
+                       % ( np.abs(Y).max(),
+                           np.mean(np.abs(Y_grad))*1e5 ), end=" " )
 
             if dim_t > 0:
                 print( "|Z|=%5.2f |Z_grad|=%7.3fe-5" \

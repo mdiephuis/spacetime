@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+'''
+experiments on toy datasets
+
+author: Ke Sun < sunk [dot] edu [at] gmail [dot] com >
+suppored by University of Geneva
+'''
+
 from __future__ import print_function
 import matplotlib.pyplot as plt
 import numpy as np
