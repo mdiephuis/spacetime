@@ -1,3 +1,9 @@
 __pycache__/
 *.py[cod]
 *.so
+data/association1000.mat
+data/association5000.mat
+data/ca-GrQc.txt.gz
+data/mm_tsne.zip
+data/nips_1-17.mat
+data/nips_1-22.mat
